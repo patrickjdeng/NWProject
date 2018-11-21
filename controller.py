@@ -1,4 +1,4 @@
-'''Controller'''
+'''Controller -> OUT TO BOTH R & S'''
 #!/usr/bin/env python
 import socket
 
@@ -6,27 +6,18 @@ TYPE = 0
 CODE = 1
 DATA = 2
 
-def controller():
+def main():
     ''' controller request list from server, send selection to renderer'''
     addr = '10.0.0.1'
     server_port = 5300
-    server_socket = create_sender_socket(addr, server_port)
-    # render_port = 5400
-    # render_socket = create_sender_socket(addr, render_port)
-    selected_index = 0
-    while selected_index != '-1':
-        media_list = get_list_from(server_socket)
-        selected_index = request_user_choice(media_list)
-        if selected_index == '-1':
-            break
-        else:
-            break
-            # TODO: check if renderer is busy
-         #   send_choice(selected_index, render_socket)
-    # disconnect_renderer(render_socket)
-    # render_socket.close()
-    disconnect_server(server_socket)
-    server_socket.close()
+    server_out_socket = create_sender_socket(addr, server_port)
+    render_port = 5400
+    render_out_socket = create_sender_socket(addr, render_port)
+    controller(server_out_socket, render_out_socket)
+    #disconnect_renderer(render_out_socket)
+    #render_out_socket.close()
+    disconnect_server(server_out_socket)
+    server_out_socket.close()
 
 
 def create_sender_socket(addr, port):
@@ -36,17 +27,36 @@ def create_sender_socket(addr, port):
     return sock
 
 
-def get_list_from(sock):
+def controller(server_out_socket, render_out_socket):
+    '''Given server, and renderer, work with both'''
+    selected_index = 0
+    while True:
+        media_list = get_list_from_server(server_out_socket)
+        selected_index = request_choice_from_user(media_list)
+        if selected_index == '-1':
+            break
+        # send selection to R
+        else:
+            busy = True
+            # TODO: check if renderer is busy
+            if not busy:
+                selected_name = media_list[selected_index]
+                send_choice_to_renderer(selected_name, render_out_socket)
+
+
+def get_list_from_server(sock):
     '''GET media list from server'''
-    message = '1;0;'  # it'll request a list from the server
     print 'Requesting list from server'
-    sock.send(message)
+    sock.send('1;0;')
     buffer_size = 1024
     print 'Receiving list from server'
     response = sock.recv(buffer_size).split(';')
-    media_list = response[DATA].translate(None, '[]')
-    media_list = media_list.split(',')
-    return media_list
+    if response[TYPE] == '0':
+        return []
+    elif response[TYPE] == '2':
+        media_list = response[DATA].translate(None, '[]')
+        media_list = media_list.split(',')
+        return media_list
 
 
 def print_list(lst):
@@ -57,18 +67,19 @@ def print_list(lst):
         index += 1
 
 
-def request_user_choice(lst):
+def request_choice_from_user(lst):
     '''Print list, get and validate user input, return choice '''
     print_list(lst)
     choice = raw_input('Select an option (or -1 to exit):')
-    while int(choice) >= len(lst) or int(choice) < -1:
-        choice = raw_input('Invalid input, try again')
+    while (choice != '-1' and not choice.isdigit()) or (int(choice) \
+        >= len(lst) or int(choice) < -1):
+        choice = raw_input('Invalid input, try again: ')
     return choice
 
 
-def send_choice(index, sock):
+def send_choice_to_renderer(filename, sock):
     '''Send media choice to renderer'''
-    message = '10;0;' + str(index) 
+    message = '10;0;' + filename
     sock.send(message)
 
 # TODO 
@@ -87,4 +98,5 @@ def disconnect_renderer(sock):
     message = '18;0;'
     sock.send(message)
 
-controller()
+
+main()
