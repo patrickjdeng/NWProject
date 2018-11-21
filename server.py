@@ -53,7 +53,7 @@ def process_list_request_from(conn):
         message = conn.recv(buff_size).split(';')
         message_type = message[TYPE]   
     if message_type == '1':
-        output = subprocess.check_output(['ls', '/home/patrick/CS4390/project'])
+        output = subprocess.check_output(['ls'])
         if  output == '':
             out_message = '0;2;' # status, none found
             conn.send(out_message)
@@ -65,9 +65,9 @@ def process_list_request_from(conn):
         print 'Disconnected from controller'
     return message_type
 
-# TODO: stuff to do here
+# TODO: All of the stuff missing is in here
 def process_file_request_from(conn):
-    '''SERVER RECEIVE LIST REQUEST FROM R, SENDS R FILE'''
+    '''SERVER RECEIVE FILE REQUEST FROM R, SENDS R FILE'''
     buff_size = 1024
     message_type = '0'
 

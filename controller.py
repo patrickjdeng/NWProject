@@ -5,6 +5,7 @@ import socket
 TYPE = 0
 CODE = 1
 DATA = 2
+BUFFER_SIZE = 1024
 
 def main():
     ''' controller request list from server, send selection to renderer'''
@@ -14,8 +15,8 @@ def main():
     render_port = 5400
     render_out_socket = create_sender_socket(addr, render_port)
     controller(server_out_socket, render_out_socket)
-    #disconnect_renderer(render_out_socket)
-    #render_out_socket.close()
+    disconnect_renderer(render_out_socket)
+    render_out_socket.close()
     disconnect_server(server_out_socket)
     server_out_socket.close()
 
@@ -26,7 +27,7 @@ def create_sender_socket(addr, port):
     sock.connect((addr, port))
     return sock
 
-
+# TODO: the renderer playback/display stuff...
 def controller(server_out_socket, render_out_socket):
     '''Given server, and renderer, work with both'''
     selected_index = 0
@@ -37,7 +38,7 @@ def controller(server_out_socket, render_out_socket):
             break
         # send selection to R
         else:
-            busy = True
+            busy = get_renderer_status(render_out_socket)
             # TODO: check if renderer is busy
             if not busy:
                 selected_name = media_list[selected_index]
@@ -77,10 +78,21 @@ def request_choice_from_user(lst):
     return choice
 
 
+def get_renderer_status(sock):
+    '''Send R status request, return whether R is busy'''
+    sock.send('11;1;')
+    while True:
+        message = sock.recv(BUFFER_SIZE).split(';')
+        if message[TYPE] == '12':
+            break
+    return message[CODE] == '1'
+
+
 def send_choice_to_renderer(filename, sock):
     '''Send media choice to renderer'''
     message = '10;0;' + filename
     sock.send(message)
+
 
 # TODO 
 def send_playback_command(sock):
@@ -92,6 +104,7 @@ def disconnect_server(sock):
     '''Send message to terminate connection to S'''
     message = '3;0;'
     sock.send(message)
+
 
 def disconnect_renderer(sock):
     '''Send message to terminate connection to R'''

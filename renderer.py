@@ -36,13 +36,13 @@ def create_listen_socket(port):
     sock.listen(1)
     return sock
 
-
+# TODO: have some fixing here 
 def renderer(control_in_socket, server_out_socket):
     '''get filename from C, request from S, play from C'''
     # TODO: break when controller sends disconnect
     control_conn, _ = control_in_socket.accept()
     while True:
-        receive_status_request_from(control_conn)
+        handle_status_request_from(control_conn)
         file_index = receive_choice_from(control_conn)
         media_file = get_file_from(file_index, server_out_socket)
         incorrect_file = True
@@ -50,7 +50,7 @@ def renderer(control_in_socket, server_out_socket):
             incorrect_file = check_correct_media(media_file,control_in_socket)
 
 #TODO: receive from controller, which is supposed to req status before sending choice
-def receive_status_request_from(conn):
+def handle_status_request_from(conn):
     '''listen for status requests from C until ready'''
     if BUSY:
         return
