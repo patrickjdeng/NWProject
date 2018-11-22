@@ -7,6 +7,7 @@ TYPE = 0
 CODE = 1
 DATA = 2
 LENGTH = 3
+BUFFER_SIZE = 1024
 
 
 def main():
@@ -36,29 +37,26 @@ def server(control_in_socket, render_in_socket):
     message_type = 0
     while True:
         message_type = process_list_request_from(control_conn)
-        if message_type =='3':
+        if message_type == '3':
             break
-        else:    
-            message_type = process_file_request_from(render_conn)
-            if message_type == '22':
-                break
+        message_type = process_file_request_from(render_conn)
+        if message_type == '22':
+            break
 
 
 def process_list_request_from(conn):
     '''SERVER RECEIVE REQUEST FROM C, SENDS C LIST OR EXIT'''
-    
-    buff_size = 1024
     message_type = '0'
     while message_type != '1' and message_type != '3':
-        message = conn.recv(buff_size).split(';')
+        message = conn.recv(BUFFER_SIZE).split(';')
         message_type = message[TYPE]   
     if message_type == '1':
-        output = subprocess.check_output(['ls'])
-        if  output == '':
+        ls_output = subprocess.check_output(['ls'])
+        if ls_output == '':
             out_message = '0;2;' # status, none found
             conn.send(out_message)
         else:
-            media_list = output.split()
+            media_list = ls_output.split()
             out_message = '2;0;' + str(media_list)
             conn.send(out_message)
     elif message_type == '3':
@@ -67,28 +65,58 @@ def process_list_request_from(conn):
 
 # TODO: All of the stuff missing is in here
 def process_file_request_from(conn):
+    # R <-> S 1
     '''SERVER RECEIVE FILE REQUEST FROM R, SENDS R FILE'''
-    buff_size = 1024
     message_type = '0'
-
-    while message_type != '20' or message_type != '22':
-        message = conn.recv(buff_size).split(';')
+    while message_type != '20' and message_type != '22':
+        message = conn.recv(BUFFER_SIZE).split(';')
         message_type = message[TYPE]
     if message_type == '20':
-        media_file = open()
         #TODO: Do we just look at the extensions to find these?
-        file_not_found, file_is_text, file_is_video = True, True, True
-        if file_not_found:
-            out_message = '21;0' # status, media not found
+        filename = message[DATA]
+        if file_is_text(filename):
+            out_message = '21;0'
             conn.send(out_message)
-        elif file_is_text:
-            out_message = '21;1' 
+        elif file_is_video(filename):
+            out_message = '21;1'
             conn.send(out_message)
-        elif file_is_video:
-            out_message = '21;2'
+        elif file_not_found(filename):
+            out_message = '21;2' # status, media not found
+            conn.send(out_message)
+        else:
+            out_message = '21;3'
             conn.send(out_message)
     else:
         print 'Disconnected from Renderer'
     return message_type
+
+
+def file_not_found(filename):
+    ''' If it was suddently deleted midway!'''
+    ls_output = subprocess.check_output(['ls'])
+    if ls_output == '':
+        return True
+    else:
+        media_list = ls_output.split()
+        return filename not in media_list
+
+
+def file_is_text(name):
+    '''Is the file a text'''
+    dot_index = name.find('.')
+    name = name[dot_index:]
+    return '.txt' in name or \
+        '.md' in name or \
+            '.cfg' in name or \
+            '.py' in name
+
+
+def file_is_video(name):
+    '''Is the file a video'''
+    dot_index = name.find('.')
+    name = name[dot_index:]
+    return '.mp4' in name or \
+        '.wmv' in name or \
+            '.avi' in name
 
 main()
