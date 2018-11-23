@@ -1,7 +1,6 @@
 '''Controller -> OUT TO BOTH R & S'''
 #!/usr/bin/env python
 import socket
-import subprocess
 
 TYPE = 0
 CODE = 1
@@ -25,7 +24,7 @@ def main():
 
 def controller(server_out_socket, render_out_socket):
     '''Given server, and renderer, work with both'''
-    # while True:
+
     print '\n\n--------------\nRequesting list from server'
     media_list = get_list_from_server(server_out_socket)
     # keep going while renderer is busy
@@ -95,6 +94,7 @@ def print_list(lst):
 
 
 def receive_media_confirmation(render_out_socket):
+    '''Get response from server about file metadata before rcv file'''
     while True:
         print 'hi2'
         in_message = render_out_socket.recv(BUFFER_SIZE).split(';')

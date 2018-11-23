@@ -29,7 +29,7 @@ def server(control_in_socket, render_in_socket):
     while True:
         message_type = process_list_request_from(control_conn)
         message_type = process_file_request_from(render_conn)
-        if message_type == '22':    #EXIT choice
+        if message_type == '23':    #EXIT choice
             break
 
 def create_listen_socket(port):
@@ -68,30 +68,30 @@ def file_not_found(filename):
     else:
         media_list = ls_output.split()
         for i in range(len(media_list)):
-            media_list[i] = media_list[i].replace('\'','').strip()
+            media_list[i] = media_list[i].replace('\'', '').strip()
         return filename not in media_list
 
 
-# TODO: handle full txt/video file transfer stuff here and renderer 
+# TODO: handle full txt/video file transfer stuff here and renderer
 def process_file_request_from(conn):
     # R <-> S 1
     '''SERVER RECEIVE FILE REQUEST FROM R, SENDS R FILE INFO and FILE'''
     message_type = '0'
-    while message_type != '20' and message_type != '22':
+    while message_type != '20' and message_type != '23':
         message = conn.recv(BUFFER_SIZE).split(';')
         message_type = message[TYPE]
     if message_type == '20':
         filename = message[DATA]
         if file_is_text(filename):
-            out_message = '21;0'    
+            out_message = '21;0'
             conn.send(out_message)
-            send_file_to_renderer(filename, conn)
+            send_file_when_ready(filename, conn)
         elif file_is_video(filename):
-            out_message = '21;1'  
+            out_message = '21;1'
             conn.send(out_message)
-            send_file_to_renderer(filename, conn)
+            send_file_when_ready(filename, conn)
         elif file_not_found(filename):
-            out_message = '21;2' # status, media not found    
+            out_message = '21;2' # status, media not found
             conn.send(out_message)
         else:
             out_message = '21;3'
@@ -106,7 +106,7 @@ def process_list_request_from(conn):
     message_type = '0'
     while message_type != '1' and message_type != '3':
         message = conn.recv(BUFFER_SIZE).split(';')
-        message_type = message[TYPE]   
+        message_type = message[TYPE]
     if message_type == '1':
         ls_output = subprocess.check_output(['ls'])
         if ls_output == '':
@@ -121,17 +121,16 @@ def process_list_request_from(conn):
     return message_type
 
 
-def send_file_to_renderer(filename, conn):
+def send_file_when_ready(filename, conn):
     '''Actually send the file bytes thru socket to R'''
-    media_file = open(filename,'rb')
-    #SYNC R<-> S FILE WRITE
-    file_chunk = media_file.read(BUFFER_SIZE)
+    #wait for ok from renderer
     while True:
-        conn.send(file_chunk)
-        if len(file_chunk) < BUFFER_SIZE:
+        in_message = conn.recv(BUFFER_SIZE).split(';')
+        if in_message[TYPE] == '22':
             break
-        file_chunk = media_file.read(BUFFER_SIZE)
-    media_file.close()
+    media_file = open(filename).read()
+    #SYNC R<-> S FILE WRITE
+    conn.send(media_file)
     return
 
 

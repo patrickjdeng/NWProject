@@ -28,19 +28,17 @@ def renderer(control_in_socket, server_out_socket):
         # C <-> R 1 ARE WE BUSY OR EXITING?
         msg_type = handle_status_or_exit_request(control_conn)
         if msg_type == '16':
-            server_out_socket.send('22;0;') #dc from server
+            server_out_socket.send('23;0;') #dc from server
             break
         # C -> R 2 ACTUAL CHOICE
         filename = receive_choice_from_control(control_conn)
         media_type = get_file_from_server(filename, server_out_socket)
         confirm_with_controller(media_type, filename, control_conn)
         if media_type == '0':
-            # show_text(filename)
-            return
+            show_text(filename)
         elif media_type == '1':
-            # play_video(filename) 
+            # play_video(filename) # still a WIP, dont wanna break things yet
             return
-        # TODO: call one of the render_vid/txt functions??
         # func(media_file)
 
 
@@ -65,7 +63,7 @@ def create_listen_socket(port):
     sock.listen(1)
     return sock
 
-# TODO: How to take whole files from server help
+
 def get_file_from_server(name, sock):
     '''RENDERER GET FILE FROM S'''
     # R <-> S 1
@@ -76,9 +74,10 @@ def get_file_from_server(name, sock):
         if in_message[TYPE] == '21':
             break
     media_type = in_message[CODE]
+    sock.send('22;0;')  #send server ok to start sending
     #SYNC R<-> S FILE WRITE
     if media_type == '0' or media_type == '1':
-        media_file = open(name,'wb')
+        media_file = open(name, 'wb')
         file_chunk = sock.recv(BUFFER_SIZE)
         while True:
             media_file.write(file_chunk)
@@ -117,7 +116,7 @@ def play_video(filename):
         cv.WaitKey(frame_delay)
 
     # When playing is done, delete the window
-    #  NOTE: this step is not strictly necessary, 
+    #  NOTE: this step is not strictly necessary,
     #         when the script terminates it will close all windows it owns anyways
     cv.destroy_window( "My Video Window" )
     BUSY = False
@@ -137,10 +136,12 @@ def receive_choice_from_control(conn):
 #TODO: placeholder till we figure out how to do this
 def receive_playback_command_from(sock):
     '''DO CERTAIN VIDEO THINGS BASED ON COMMAND FROM C'''
+    #delete the file after finishing
     return 0
 
 #TODO: hmm txt... discussion?
 def show_text(filename):
+    #delete the file after finishing
     return
 
 main()
