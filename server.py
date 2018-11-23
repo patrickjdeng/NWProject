@@ -2,6 +2,7 @@
 #!/usr/bin/env python
 import socket
 import subprocess
+import os
 
 TYPE = 0
 CODE = 1
@@ -17,9 +18,19 @@ def main():
     render_port = 5500
     render_in_socket = create_listen_socket(render_port)
     server(control_in_socket, render_in_socket)
-    control_in_socket.close()
-    render_in_socket.close()
 
+
+
+def server(control_in_socket, render_in_socket):
+    '''get requests from controller and renderer'''
+    os.chdir('server')
+    control_conn, _ = control_in_socket.accept()
+    render_conn, _ = render_in_socket.accept()
+    while True:
+        message_type = process_list_request_from(control_conn)
+        message_type = process_file_request_from(render_conn)
+        if message_type == '22':    #EXIT choice
+            break
 
 def create_listen_socket(port):
     '''create, make listen, return socket listening to any ip'''
@@ -30,18 +41,64 @@ def create_listen_socket(port):
     return sock
 
 
-def server(control_in_socket, render_in_socket):
-    '''get requests from controller and renderer'''
-    control_conn, _ = control_in_socket.accept()
-    render_conn, _ = render_in_socket.accept()
-    message_type = 0
-    while True:
-        message_type = process_list_request_from(control_conn)
-        if message_type == '3':
-            break
-        message_type = process_file_request_from(render_conn)
-        if message_type == '22':
-            break
+def file_is_text(name):
+    '''Is the file a text'''
+    dot_index = name.find('.')
+    name = name[dot_index:]
+    return '.txt' in name or \
+        '.md' in name or \
+            '.cfg' in name or \
+                '.py' in name
+
+
+def file_is_video(name):
+    '''Is the file a video'''
+    dot_index = name.find('.')
+    name = name[dot_index:]
+    return '.mp4' in name or \
+        '.wmv' in name or \
+            '.avi' in name
+
+
+def file_not_found(filename):
+    ''' If it was suddently deleted midway!'''
+    ls_output = subprocess.check_output(['ls'])
+    if ls_output == '':
+        return True
+    else:
+        media_list = ls_output.split()
+        for i in range(len(media_list)):
+            media_list[i] = media_list[i].replace('\'','').strip()
+        return filename not in media_list
+
+
+# TODO: handle full txt/video file transfer stuff here and renderer 
+def process_file_request_from(conn):
+    # R <-> S 1
+    '''SERVER RECEIVE FILE REQUEST FROM R, SENDS R FILE INFO and FILE'''
+    message_type = '0'
+    while message_type != '20' and message_type != '22':
+        message = conn.recv(BUFFER_SIZE).split(';')
+        message_type = message[TYPE]
+    if message_type == '20':
+        filename = message[DATA]
+        if file_is_text(filename):
+            out_message = '21;0'    
+            conn.send(out_message)
+            send_file_to_renderer(filename, conn)
+        elif file_is_video(filename):
+            out_message = '21;1'  
+            conn.send(out_message)
+            send_file_to_renderer(filename, conn)
+        elif file_not_found(filename):
+            out_message = '21;2' # status, media not found    
+            conn.send(out_message)
+        else:
+            out_message = '21;3'
+            conn.send(out_message)
+    else:
+        print 'Disconnected from Renderer'
+    return message_type
 
 
 def process_list_request_from(conn):
@@ -63,60 +120,19 @@ def process_list_request_from(conn):
         print 'Disconnected from controller'
     return message_type
 
-# TODO: All of the stuff missing is in here
-def process_file_request_from(conn):
-    # R <-> S 1
-    '''SERVER RECEIVE FILE REQUEST FROM R, SENDS R FILE'''
-    message_type = '0'
-    while message_type != '20' and message_type != '22':
-        message = conn.recv(BUFFER_SIZE).split(';')
-        message_type = message[TYPE]
-    if message_type == '20':
-        #TODO: Do we just look at the extensions to find these?
-        filename = message[DATA]
-        if file_is_text(filename):
-            out_message = '21;0'
-            conn.send(out_message)
-        elif file_is_video(filename):
-            out_message = '21;1'
-            conn.send(out_message)
-        elif file_not_found(filename):
-            out_message = '21;2' # status, media not found
-            conn.send(out_message)
-        else:
-            out_message = '21;3'
-            conn.send(out_message)
-    else:
-        print 'Disconnected from Renderer'
-    return message_type
 
+def send_file_to_renderer(filename, conn):
+    '''Actually send the file bytes thru socket to R'''
+    media_file = open(filename,'rb')
+    #SYNC R<-> S FILE WRITE
+    file_chunk = media_file.read(BUFFER_SIZE)
+    while True:
+        conn.send(file_chunk)
+        if len(file_chunk) < BUFFER_SIZE:
+            break
+        file_chunk = media_file.read(BUFFER_SIZE)
+    media_file.close()
+    return
 
-def file_not_found(filename):
-    ''' If it was suddently deleted midway!'''
-    ls_output = subprocess.check_output(['ls'])
-    if ls_output == '':
-        return True
-    else:
-        media_list = ls_output.split()
-        return filename not in media_list
-
-
-def file_is_text(name):
-    '''Is the file a text'''
-    dot_index = name.find('.')
-    name = name[dot_index:]
-    return '.txt' in name or \
-        '.md' in name or \
-            '.cfg' in name or \
-            '.py' in name
-
-
-def file_is_video(name):
-    '''Is the file a video'''
-    dot_index = name.find('.')
-    name = name[dot_index:]
-    return '.mp4' in name or \
-        '.wmv' in name or \
-            '.avi' in name
 
 main()
