@@ -27,7 +27,9 @@ def server(control_in_socket, render_in_socket):
     control_conn, _ = control_in_socket.accept()
     render_conn, _ = render_in_socket.accept()
     while True:
+        print "awaiting list request"
         message_type = process_list_request_from(control_conn)
+        print "awaiting media request"
         message_type = process_file_request_from(render_conn)
         if message_type == '23':    #EXIT choice
             break
@@ -80,6 +82,8 @@ def process_file_request_from(conn):
     while message_type != '20' and message_type != '23':
         message = conn.recv(BUFFER_SIZE).split(';')
         message_type = message[TYPE]
+        if message_type != '':
+            print message
     if message_type == '20':
         filename = message[DATA]
         if file_is_text(filename):
@@ -131,6 +135,7 @@ def send_file_when_ready(filename, conn):
     media_file = open(filename).read()
     #SYNC R<-> S FILE WRITE
     conn.send(media_file)
+    print "Done sending"
     return
 
 

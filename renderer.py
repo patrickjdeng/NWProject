@@ -1,7 +1,6 @@
 '''RENDERER: IN FROM C, OUT TO S'''
 #!/usr/bin/env python
 import socket
-import numpy
 import cv2 as cv # must install externally!
 
 TYPE = 0
@@ -25,10 +24,15 @@ def renderer(control_in_socket, server_out_socket):
     '''get filename from C, request from S, play from C'''
     control_conn, _ = control_in_socket.accept()
     while True:
+        print "awaiting controller request"
         # C <-> R 1 ARE WE BUSY OR EXITING?
         msg_type = handle_status_or_exit_request(control_conn)
+        if msg_type != '':
+            print msg_type
         if msg_type == '16':
-            server_out_socket.send('23;0;') #dc from server
+            out_message = '23;0;'
+            print 'Disconnected from Server'
+            server_out_socket.send(out_message) #dc from server
             break
         # C -> R 2 ACTUAL CHOICE
         filename = receive_choice_from_control(control_conn)
@@ -38,7 +42,7 @@ def renderer(control_in_socket, server_out_socket):
             show_text(filename)
         elif media_type == '1':
             # play_video(filename) # still a WIP, dont wanna break things yet
-            return
+            print "video"
         # func(media_file)
 
 
@@ -74,9 +78,10 @@ def get_file_from_server(name, sock):
         if in_message[TYPE] == '21':
             break
     media_type = in_message[CODE]
-    sock.send('22;0;')  #send server ok to start sending
+
     #SYNC R<-> S FILE WRITE
     if media_type == '0' or media_type == '1':
+        sock.send('22;0;')  #send server ok to start sending
         media_file = open(name, 'wb')
         file_chunk = sock.recv(BUFFER_SIZE)
         while True:
@@ -84,6 +89,7 @@ def get_file_from_server(name, sock):
             if len(file_chunk) < BUFFER_SIZE:
                 break
             file_chunk = sock.recv(BUFFER_SIZE)
+        print "Done Reading"
         media_file.close()
     return media_type
 

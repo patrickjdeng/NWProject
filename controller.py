@@ -24,30 +24,28 @@ def main():
 
 def controller(server_out_socket, render_out_socket):
     '''Given server, and renderer, work with both'''
-
-    print '\n\n--------------\nRequesting list from server'
-    media_list = get_list_from_server(server_out_socket)
-    # keep going while renderer is busy
     while True:
-        selected_index = request_choice_from_user(media_list)
-        if selected_index == -1:
-            break   # We send exit code when render expects status request
-        print 'Checking if renderer is busy...'
-        # C <-> R 1
-        if not renderer_busy(render_out_socket):
-            break
+        print '\n\n--------------\nRequesting list from server'
+        media_list = get_list_from_server(server_out_socket)
+        # keep going while renderer is busy
+        while True:
+            selected_index = request_choice_from_user(media_list)
+            if selected_index == -1:
+                return   # We send exit code when render expects status request
+            print 'Checking if renderer is busy...'
+            # C <-> R 1
+            if not renderer_busy(render_out_socket):
+                break
+            else:
+                print 'Renderer is busy! Try again: '
         else:
-            print 'Renderer is busy! Try again: '
-    if selected_index == -1:
-        return
-    else:
-        print 'Sending choice to Renderer...'
-    selected_name = media_list[selected_index]
-    print selected_name
-    #C->R 2
-    send_choice_to_renderer(selected_name, render_out_socket)
-    receive_media_confirmation(render_out_socket)
-    print 'Received media'
+            print 'Sending choice to Renderer...'
+        selected_name = media_list[selected_index]
+        print selected_name
+        #C->R 2
+        send_choice_to_renderer(selected_name, render_out_socket)
+        receive_media_confirmation(render_out_socket)
+        print 'Received media'
 
 def create_sender_socket(addr, port):
     '''create, connect, return socket sending to certain ip'''
