@@ -100,7 +100,7 @@ def receive_media_confirmation(render_out_socket):
         if in_message[TYPE] == '13':            
             break
     if in_message[CODE] == '0':
-        text_playback(render_out_socket)
+        image_playback(render_out_socket)
     elif in_message[CODE] == '1':
         video_playback(render_out_socket)
     else:
@@ -132,19 +132,26 @@ def send_choice_to_renderer(filename, sock):
     message = '12;0;' + filename
     sock.send(message)
 
-# TODO: PLAYBACK COMMANDS HOW DO???
-def text_playback(sock):
-    '''Show text I guess...'''
-    print 'Opening the text!'
 
+def image_playback(sock):
+    '''Show image'''
+    print 'Opening the image!'
+    while True:
+        choice = raw_input('Enter c to close: ')
+        if choice == 'c': 
+            sock.send('14;3;')
+            break
     #idk what to do here tbh
-
+    while True: #wait for renderer to finish stopping
+        message = sock.recv(BUFFER_SIZE).split(';')
+        if message[TYPE] == '16':
+            break
 
 def video_playback(sock):
     '''Get media, PLAY, PAUSE, ETC. RELAY TO RENDERER'''
     print 'Starting the video!'
     while True:
-        choice = raw_input('Enter p for play; o for pause; r for rewind; s for stop')
+        choice = raw_input('Enter p for play; o for pause; r for rewind; s for stop: ')
         if choice == 'p':
             sock.send('14;0;')
             print "Playing..."

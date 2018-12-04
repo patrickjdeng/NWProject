@@ -43,14 +43,13 @@ def create_listen_socket(port):
     return sock
 
 
-def file_is_text(name):
-    '''Is the file a text'''
+def file_is_image(name):
+    '''Is the file an image'''
     dot_index = name.find('.')
     name = name[dot_index:]
-    return '.txt' in name or \
-        '.md' in name or \
-            '.cfg' in name or \
-                '.py' in name
+    return '.jpeg' in name or \
+        '.jpg' in name or \
+            '.png' in name
 
 
 def file_is_video(name):
@@ -74,7 +73,7 @@ def file_not_found(filename):
         return filename not in media_list
 
 
-# TODO: handle full txt/video file transfer stuff here and renderer
+
 def process_file_request_from(conn):
     # R <-> S 1
     '''SERVER RECEIVE FILE REQUEST FROM R, SENDS R FILE INFO and FILE'''
@@ -86,7 +85,7 @@ def process_file_request_from(conn):
             print message
     if message_type == '20':
         filename = message[DATA]
-        if file_is_text(filename):
+        if file_is_image(filename):
             out_message = '21;0'
             conn.send(out_message)
             send_file_when_ready(filename, conn)

@@ -2,8 +2,12 @@
 #!/usr/bin/env python
 import socket
 import select
+import os
 import numpy as np
+import psutil
+from PIL import Image
 import cv2 # must install externally!
+
 
 TYPE = 0
 CODE = 1
@@ -36,9 +40,9 @@ def renderer(control_in_socket, server_out_socket):
         media_type = get_file_from_server(filename, server_out_socket)
         confirm_with_controller(media_type, filename, control_conn)
         if media_type == '0':
-            show_text(filename)
+            show_image(filename, control_conn)
         elif media_type == '1':
-            show_video(filename, control_conn) 
+            show_video(filename, control_conn)
 
 
 def confirm_with_controller(media_type, filename, control_conn):
@@ -101,33 +105,7 @@ def handle_status_or_exit_request(conn):
     return message_type
 
 
-def show_video(filename, sock):
-    '''Render video, while getting commands from C'''
-    cap = cv2.VideoCapture(filename)
-    print 'ok'
-    while cap.isOpened():
-        ret, frame = cap.read()
-        if not ret:
-            print 'last frame'
-            while True:
-                message = sock.recv(BUFFER_SIZE).split(';')
-                if message[TYPE] == '14':
-                    if message[CODE] == '2':
-                        print 'rewind'
-                        cap.set(2,0)
-                        ret, frame = cap.read()
-                        break
-                    elif message[CODE] == '3':
-                        break
-            if message[CODE] == '3':
-                print 'stopped'
-                break
-        code = play_frame(cap, frame, sock)
-        if code == 3:
-            break
-    cap.release()
-    cv2.destroyAllWindows()
-    sock.send('16;0')
+
 
 def play_frame(cap, frame, sock):
     '''Given frame, will listen for controller command and render the frame'''
@@ -147,12 +125,12 @@ def play_frame(cap, frame, sock):
                             break
                         elif message[CODE] == '2':
                             print 'rewind'
-                            cap.set(2,0)
+                            cap.set(2, 0)
                         elif message[CODE] == '3':
                             break
             if message[CODE] == '2':
                 print 'rewind'
-                cap.set(2,0)
+                cap.set(2, 0)
             if message[CODE] == '3':
                 print 'stopped'
                 code = 3
@@ -171,8 +149,51 @@ def receive_choice_from_control(conn):
         return ''
 
 
-def show_text(filename):
+def show_image(filename, sock):
+    '''render image'''
     #delete the file after finishing
-    return
+    print 'IMAGE'
+    image = Image.open(filename)
+    image.show()
+    while True:
+        print 'hello'
+        message = sock.recv(BUFFER_SIZE).split(';')
+        if message[TYPE] == '14' and message[CODE] == '3':
+            break
+    image.close()
+    for proc in psutil.process_iter():
+        if proc.name() == "display":
+            proc.kill()
+    sock.send('16;0')
+    os.remove(filename)
+
+def show_video(filename, sock):
+    '''Render video, while getting commands from C'''
+    cap = cv2.VideoCapture(filename)
+    print 'ok'
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret:
+            print 'last frame'
+            while True:
+                message = sock.recv(BUFFER_SIZE).split(';')
+                if message[TYPE] == '14':
+                    if message[CODE] == '2':
+                        print 'rewind'
+                        cap.set(2, 0)
+                        ret, frame = cap.read()
+                        break
+                    elif message[CODE] == '3':
+                        break
+            if message[CODE] == '3':
+                print 'stopped'
+                break
+        code = play_frame(cap, frame, sock)
+        if code == 3:
+            break
+    cap.release()
+    cv2.destroyAllWindows()
+    sock.send('16;0')
+    os.remove(filename)
 
 main()
