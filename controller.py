@@ -143,7 +143,7 @@ def text_playback(sock):
 def video_playback(sock):
     '''Get media, PLAY, PAUSE, ETC. RELAY TO RENDERER'''
     print 'Starting the video!'
-    while True:    
+    while True:
         choice = raw_input('Enter p for play; o for pause; r for rewind; s for stop')
         if choice == 'p':
             sock.send('14;0;')

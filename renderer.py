@@ -1,9 +1,9 @@
 '''RENDERER: IN FROM C, OUT TO S'''
 #!/usr/bin/env python
 import socket
+import select
 import numpy as np
 import cv2 # must install externally!
-import select
 
 TYPE = 0
 CODE = 1
@@ -21,7 +21,7 @@ def main():
     renderer(control_in_socket, server_socket)
     server_socket.close()
 
-# TODO: HOW TO ACTUALLY PLAY THE VIDEO/TEXT ONCE WE HAVE IT?
+
 def renderer(control_in_socket, server_out_socket):
     '''get filename from C, request from S, play from C'''
     control_conn, _ = control_in_socket.accept()
@@ -38,8 +38,7 @@ def renderer(control_in_socket, server_out_socket):
         if media_type == '0':
             show_text(filename)
         elif media_type == '1':
-            show_video(filename, control_conn) # still a WIP, dont wanna break things yet
-        #func(media_file)
+            show_video(filename, control_conn) 
 
 
 def confirm_with_controller(media_type, filename, control_conn):
@@ -101,51 +100,64 @@ def handle_status_or_exit_request(conn):
             conn.send('11;0;')
     return message_type
 
-#TODO: Literally from stackoverflow
+
 def show_video(filename, sock):
     '''Render video, while getting commands from C'''
     cap = cv2.VideoCapture(filename)
-    BUSY = True
     print 'ok'
     while cap.isOpened():
         ret, frame = cap.read()
         if not ret:
-            print 'bye'
+            print 'last frame'
+            while True:
+                message = sock.recv(BUFFER_SIZE).split(';')
+                if message[TYPE] == '14':
+                    if message[CODE] == '2':
+                        print 'rewind'
+                        cap.set(2,0)
+                        ret, frame = cap.read()
+                        break
+                    elif message[CODE] == '3':
+                        break
+            if message[CODE] == '3':
+                print 'stopped'
+                break
+        code = play_frame(cap, frame, sock)
+        if code == 3:
             break
-        cv2.imshow('frame', frame)
-        readable, _, _ = select.select([sock],[],[],0)
-        if sock in readable:
-            print 'cool'
-            message = sock.recv(BUFFER_SIZE).split(';')
-            if message[TYPE] == '14':
-                if message[CODE] == '0': #play/resume
-                    continue
-                elif message[CODE] == '1': #pause
-                    print 'pause'
-                    while True:
-                        message = sock.recv(BUFFER_SIZE).split(';')
-                        if message[TYPE] == '14':
-                            if message[CODE] == '0':
-                                print 'play'
-                                break
-                            elif message[CODE] == '2':
-                                print 'rewind'
-                                cap.set(2,0)
-                            elif message[CODE] == '3':
-                                break
-                if message[CODE] == '2':
-                    print 'rewind'
-                    cap.set(2,0)
-                if message[CODE] == '3':
-                    break
-        cv2.waitKey(16)
-    print 'bye2'
     cap.release()
     cv2.destroyAllWindows()
-    BUSY = False
     sock.send('16;0')
 
-
+def play_frame(cap, frame, sock):
+    '''Given frame, will listen for controller command and render the frame'''
+    cv2.imshow('frame', frame)
+    code = 0
+    readable, _, _ = select.select([sock], [], [], 0)
+    if sock in readable:
+        message = sock.recv(BUFFER_SIZE).split(';')
+        if message[TYPE] == '14':
+            if message[CODE] == '1': #pause
+                print 'pause'
+                while True:
+                    message = sock.recv(BUFFER_SIZE).split(';')
+                    if message[TYPE] == '14':
+                        if message[CODE] == '0':
+                            print 'play'
+                            break
+                        elif message[CODE] == '2':
+                            print 'rewind'
+                            cap.set(2,0)
+                        elif message[CODE] == '3':
+                            break
+            if message[CODE] == '2':
+                print 'rewind'
+                cap.set(2,0)
+            if message[CODE] == '3':
+                print 'stopped'
+                code = 3
+    cv2.waitKey(16)
+    return code
 
 def receive_choice_from_control(conn):
     '''RENDERER RECEIVE LIST CHOICE FROM C'''
@@ -159,7 +171,6 @@ def receive_choice_from_control(conn):
         return ''
 
 
-#TODO: hmm txt... discussion?
 def show_text(filename):
     #delete the file after finishing
     return
