@@ -16,7 +16,8 @@ def main():
     render_port = 5400
     render_out_socket = create_sender_socket(render_addr, render_port)
     controller(server_out_socket, render_out_socket)
-    disconnect_renderer(render_out_socket)
+    disconnect_renderer(
+        render_out_socket)
     render_out_socket.close()
     disconnect_server(server_out_socket)
     server_out_socket.close()
@@ -45,7 +46,6 @@ def controller(server_out_socket, render_out_socket):
         #C->R 2
         send_choice_to_renderer(selected_name, render_out_socket)
         receive_media_confirmation(render_out_socket)
-        print 'Received media'
 
 def create_sender_socket(addr, port):
     '''create, connect, return socket sending to certain ip'''
@@ -63,7 +63,7 @@ def disconnect_server(sock):
 
 def disconnect_renderer(sock):
     '''Send message to terminate connection to R'''
-    message = '16;0;'
+    message = '17;0;'
     sock.send(message)
     print 'Disconnecting from renderer'
 
@@ -143,6 +143,25 @@ def text_playback(sock):
 def video_playback(sock):
     '''Get media, PLAY, PAUSE, ETC. RELAY TO RENDERER'''
     print 'Starting the video!'
-
-
+    while True:    
+        choice = raw_input('Enter p for play; o for pause; r for rewind; s for stop')
+        if choice == 'p':
+            sock.send('14;0;')
+            print "Playing..."
+        elif choice == 'o':
+            print "Pausing..."
+            sock.send('14;1;')
+        elif choice == 'r':
+            print 'Rewinding...'
+            sock.send('14;2;')
+        elif choice == 's':
+            print "Stopping..."
+            sock.send('14;3;')
+            break
+        else:
+            print 'Invalid input\n'
+    while True: #wait for renderer to finish stopping
+        message = sock.recv(BUFFER_SIZE).split(';')
+        if message[TYPE] == '16':
+            break
 main()

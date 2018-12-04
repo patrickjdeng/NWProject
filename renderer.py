@@ -3,6 +3,7 @@
 import socket
 import numpy as np
 import cv2 # must install externally!
+import select
 
 TYPE = 0
 CODE = 1
@@ -27,7 +28,7 @@ def renderer(control_in_socket, server_out_socket):
     while True:
         # C <-> R 1 ARE WE BUSY OR EXITING?
         msg_type = handle_status_or_exit_request(control_conn)
-        if msg_type == '16':
+        if msg_type == '17':
             server_out_socket.send('23;0;') #dc from server
             break
         # C -> R 2 ACTUAL CHOICE
@@ -37,9 +38,8 @@ def renderer(control_in_socket, server_out_socket):
         if media_type == '0':
             show_text(filename)
         elif media_type == '1':
-            play_video(filename) # still a WIP, dont wanna break things yet
-            return
-         #func(media_file)
+            show_video(filename, control_conn) # still a WIP, dont wanna break things yet
+        #func(media_file)
 
 
 def confirm_with_controller(media_type, filename, control_conn):
@@ -92,7 +92,7 @@ def handle_status_or_exit_request(conn):
     while True:
         message = conn.recv(BUFFER_SIZE).split(';')
         message_type = message[TYPE]
-        if message_type == '10' or message_type == '16':
+        if message_type == '10' or message_type == '17':
             break
     if message_type == '10':
         if BUSY:
@@ -102,16 +102,48 @@ def handle_status_or_exit_request(conn):
     return message_type
 
 #TODO: Literally from stackoverflow
-def play_video(filename):
+def show_video(filename, sock):
     '''Render video, while getting commands from C'''
-    cap = capture =cv2.VideoCapture(filename)
-    while(cap.isOpened()):
+    cap = cv2.VideoCapture(filename)
+    BUSY = True
+    print 'ok'
+    while cap.isOpened():
         ret, frame = cap.read()
+        if not ret:
+            print 'bye'
+            break
         cv2.imshow('frame', frame)
-        cv2.waitKey(100)
+        readable, _, _ = select.select([sock],[],[],0)
+        if sock in readable:
+            print 'cool'
+            message = sock.recv(BUFFER_SIZE).split(';')
+            if message[TYPE] == '14':
+                if message[CODE] == '0': #play/resume
+                    continue
+                elif message[CODE] == '1': #pause
+                    print 'pause'
+                    while True:
+                        message = sock.recv(BUFFER_SIZE).split(';')
+                        if message[TYPE] == '14':
+                            if message[CODE] == '0':
+                                print 'play'
+                                break
+                            elif message[CODE] == '2':
+                                print 'rewind'
+                                cap.set(2,0)
+                            elif message[CODE] == '3':
+                                break
+                if message[CODE] == '2':
+                    print 'rewind'
+                    cap.set(2,0)
+                if message[CODE] == '3':
+                    break
+        cv2.waitKey(16)
+    print 'bye2'
     cap.release()
     cv2.destroyAllWindows()
     BUSY = False
+    sock.send('16;0')
 
 
 
@@ -119,18 +151,13 @@ def receive_choice_from_control(conn):
     '''RENDERER RECEIVE LIST CHOICE FROM C'''
     while True:
         message = conn.recv(BUFFER_SIZE).split(';')
-        if message[TYPE] == '12' or message[TYPE] == '16':
+        if message[TYPE] == '12' or message[TYPE] == '17':
             break
     if message[TYPE] == '12':
         return message[DATA]
-    elif message[TYPE] == '16':
+    elif message[TYPE] == '17':
         return ''
 
-#TODO: placeholder till we figure out how to do this
-def receive_playback_command_from(sock):
-    '''DO CERTAIN VIDEO THINGS BASED ON COMMAND FROM C'''
-    #delete the file after finishing
-    return 0
 
 #TODO: hmm txt... discussion?
 def show_text(filename):
